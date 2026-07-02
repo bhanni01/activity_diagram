@@ -17,7 +17,9 @@ const exportCache = {
 function diagramFingerprint() {
   return JSON.stringify({
     name: getDiagramName(),
-    elements: state.elements.map((e) => [e.id, e.type, e.label, Math.round(e.x), Math.round(e.y)]),
+    elements: state.elements.map((e) => [
+      e.id, e.type, e.label, e.description || "", Math.round(e.x), Math.round(e.y), e.w, e.h,
+    ]),
     connections: state.connections.map((c) => [c.from, c.to]),
   });
 }
@@ -260,6 +262,9 @@ function generatePrompt() {
   lines.push("");
   state.elements.forEach((el, i) => {
     lines.push(`${i + 1}. [${ElementTypes[el.type].name}] "${el.label}" (id: ${el.id})`);
+    if (el.description) {
+      lines.push(`   Description: ${el.description.replace(/\s*\n\s*/g, " ")}`);
+    }
   });
   lines.push("");
   lines.push(`## Flow (${state.connections.length} connections)`);

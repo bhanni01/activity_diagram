@@ -442,6 +442,191 @@ select.text-input option {
 .conn-dot.in { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 .conn-dot.out { background: var(--primary); box-shadow: 0 0 6px var(--primary); }
 
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 10px;
+}
+
+.text-input[readonly] {
+  color: var(--text-dim);
+  border-style: dashed;
+  cursor: default;
+}
+
+.text-input[readonly]:focus {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+textarea.text-input {
+  resize: vertical;
+  min-height: 58px;
+  font-family: inherit;
+}
+
+.conn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+}
+
+.conn-list-empty {
+  color: var(--text-dim);
+}
+
+.conn-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.conn-item:hover {
+  border-color: var(--accent);
+}
+
+.conn-item .conn-arrow {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.conn-item .conn-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conn-item .conn-remove {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.conn-item .conn-remove:hover {
+  color: var(--secondary);
+}
+
+.props-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.props-buttons .btn {
+  justify-content: center;
+  flex: 1;
+}
+
+.props-buttons .danger-btn {
+  margin-top: 0;
+}
+
+/* ---------- Inline label editing ---------- */
+.inline-edit {
+  position: absolute;
+  z-index: 12;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text);
+  background: rgba(6, 9, 26, 0.95);
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  outline: none;
+  box-shadow: 0 0 14px rgba(0, 255, 136, 0.4);
+}
+
+/* ---------- Context menu ---------- */
+.context-menu {
+  position: fixed;
+  z-index: 70;
+  min-width: 170px;
+  padding: 5px;
+  background: var(--bg-panel-solid);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 0 24px rgba(0, 217, 255, 0.18), 0 14px 40px rgba(0, 0, 0, 0.6);
+}
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.ctx-item:hover {
+  background: rgba(0, 217, 255, 0.12);
+}
+
+.ctx-danger {
+  color: #ff7ab1;
+}
+
+.ctx-danger:hover {
+  background: rgba(255, 0, 110, 0.14);
+}
+
+.ctx-divider {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--border);
+}
+
+.ctx-arrow {
+  color: var(--text-dim);
+}
+
+.ctx-submenu-parent {
+  position: relative;
+}
+
+.ctx-submenu {
+  position: absolute;
+  top: -6px;
+  left: calc(100% - 2px);
+  min-width: 120px;
+  padding: 5px;
+  background: var(--bg-panel-solid);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
+  display: none;
+}
+
+.ctx-submenu-parent:hover .ctx-submenu,
+.ctx-submenu:hover {
+  display: block;
+}
+
+.context-menu.submenu-left .ctx-submenu {
+  left: auto;
+  right: calc(100% - 2px);
+}
+
 /* ---------- Modal ---------- */
 .modal-backdrop[hidden],
 .toast[hidden],
@@ -484,6 +669,25 @@ select.text-input option {
   font-size: 1rem;
   letter-spacing: 1px;
   color: var(--primary);
+}
+
+.modal-small {
+  width: min(380px, 92vw);
+}
+
+.modal-hint {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.modal-hint code {
+  color: var(--accent);
+  font-size: 0.74rem;
+}
+
+#bulk-text {
+  min-height: 170px;
 }
 
 .prompt-text {

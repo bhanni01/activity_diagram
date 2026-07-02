@@ -44,6 +44,9 @@
       <div class="tool-group">
         <button id="btn-clear" class="btn action-btn" title="Remove all elements and connections from the canvas">Clear All</button>
         <button id="btn-layout" class="btn action-btn" title="Automatically arrange elements top-to-bottom by flow">Auto Layout</button>
+        <button id="btn-bulk" class="btn action-btn" title="Create many elements at once from pasted text">Bulk Import</button>
+        <button id="btn-undo" class="btn action-btn" title="Undo the last action (Ctrl+Z)">Undo</button>
+        <button id="btn-redo" class="btn action-btn" title="Redo the last undone action (Ctrl+Y)">Redo</button>
       </div>
 
       <h2 class="panel-title">Export</h2>
@@ -68,10 +71,11 @@
 
       <div class="help-text">
         <p><strong>How to use:</strong></p>
-        <p>1. Pick an element, then click the canvas to place it.</p>
-        <p>2. Drag elements to move them.</p>
+        <p>1. Click an element button, name it, and it appears on the canvas.</p>
+        <p>2. Drag elements to move them; double-click to rename inline.</p>
         <p>3. Hover an element and drag from a port (small dot) to another element to connect them.</p>
-        <p>4. Click an element to edit it in the right panel.</p>
+        <p>4. Right-click an element for quick actions; the right panel has the full editor.</p>
+        <p>5. Ctrl+Z / Ctrl+Y undo and redo. Delete removes, Escape deselects.</p>
       </div>
     </aside>
 
@@ -118,7 +122,7 @@
       <h2 class="panel-title">Properties</h2>
       <div id="props-empty" class="props-empty">Select an element to edit its properties.</div>
       <div id="props-editor" class="props-editor" hidden>
-        <label class="field-label" for="prop-label">Label</label>
+        <label class="field-label" for="prop-label">Name</label>
         <input id="prop-label" class="text-input" type="text" maxlength="80" />
         <label class="field-label" for="prop-type">Type</label>
         <select id="prop-type" class="text-input">
@@ -128,11 +132,36 @@
           <option value="decision">Decision</option>
           <option value="merge">Merge</option>
         </select>
+        <label class="field-label" for="prop-desc">Description</label>
+        <textarea id="prop-desc" class="text-input" rows="3" maxlength="500" placeholder="Optional notes about this step"></textarea>
+        <div class="form-grid">
+          <div>
+            <label class="field-label" for="prop-x">X</label>
+            <input id="prop-x" class="text-input" type="text" readonly tabindex="-1" />
+          </div>
+          <div>
+            <label class="field-label" for="prop-y">Y</label>
+            <input id="prop-y" class="text-input" type="text" readonly tabindex="-1" />
+          </div>
+          <div>
+            <label class="field-label" for="prop-w">Width</label>
+            <input id="prop-w" class="text-input" type="number" min="40" max="400" step="10" />
+          </div>
+          <div>
+            <label class="field-label" for="prop-h">Height</label>
+            <input id="prop-h" class="text-input" type="number" min="40" max="300" step="10" />
+          </div>
+        </div>
         <div class="conn-indicators">
           <div class="conn-row"><span class="conn-dot in"></span> Incoming: <span id="prop-in">0</span></div>
           <div class="conn-row"><span class="conn-dot out"></span> Outgoing: <span id="prop-out">0</span></div>
         </div>
-        <button id="prop-delete" class="btn danger-btn" title="Delete this element and its connections">Delete Element</button>
+        <h2 class="panel-title">Connected Elements</h2>
+        <div id="prop-connections" class="conn-list"></div>
+        <div class="props-buttons">
+          <button id="prop-duplicate" class="btn action-btn" title="Create a copy of this element">Duplicate</button>
+          <button id="prop-delete" class="btn danger-btn" title="Delete this element and its connections">Delete</button>
+        </div>
       </div>
     </aside>
   </main>
@@ -150,6 +179,69 @@
         <button id="prompt-download" class="btn export-btn" title="Download the prompt as a .txt file">Download .txt</button>
       </div>
     </div>
+  </div>
+
+  <!-- ============ Create element modal ============ -->
+  <div id="create-modal" class="modal-backdrop" hidden>
+    <div class="modal modal-small" role="dialog" aria-modal="true" aria-labelledby="create-modal-title">
+      <div class="modal-header">
+        <h3 id="create-modal-title">New Element</h3>
+        <button id="create-close" class="btn icon-btn" title="Cancel">&times;</button>
+      </div>
+      <label class="field-label" for="create-label">Label</label>
+      <input id="create-label" class="text-input" type="text" maxlength="80" />
+      <div class="modal-actions">
+        <button id="create-cancel" class="btn action-btn">Cancel</button>
+        <button id="create-confirm" class="btn export-btn">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Bulk import modal ============ -->
+  <div id="bulk-modal" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="bulk-modal-title">
+      <div class="modal-header">
+        <h3 id="bulk-modal-title">Bulk Import</h3>
+        <button id="bulk-close" class="btn icon-btn" title="Cancel">&times;</button>
+      </div>
+      <p class="modal-hint">
+        One element per line as <code>Type: Label</code> &mdash; e.g. <code>Activity: Validate Input</code> or
+        <code>Decision: Is Valid?</code>. Types: start, end, activity, decision, merge.
+        Lines without a type become activities.
+      </p>
+      <textarea id="bulk-text" class="prompt-text" spellcheck="false" placeholder="Start: Begin
+Activity: Validate Input
+Decision: Is Valid?
+Activity: Process Data
+End: Done"></textarea>
+      <label class="toggle-row">
+        <input id="bulk-connect" type="checkbox" checked />
+        <span>Auto-connect elements in sequence</span>
+      </label>
+      <div class="modal-actions">
+        <button id="bulk-cancel" class="btn action-btn">Cancel</button>
+        <button id="bulk-confirm" class="btn export-btn" title="Create all elements (Ctrl+Enter)">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Context menu ============ -->
+  <div id="context-menu" class="context-menu" hidden>
+    <button class="ctx-item" data-action="edit">Edit Label</button>
+    <button class="ctx-item" data-action="duplicate">Duplicate</button>
+    <div class="ctx-submenu-parent">
+      <button class="ctx-item">Change Type <span class="ctx-arrow">&#9656;</span></button>
+      <div class="ctx-submenu">
+        <button class="ctx-item" data-action="type" data-type="start">Start</button>
+        <button class="ctx-item" data-action="type" data-type="end">End</button>
+        <button class="ctx-item" data-action="type" data-type="activity">Activity</button>
+        <button class="ctx-item" data-action="type" data-type="decision">Decision</button>
+        <button class="ctx-item" data-action="type" data-type="merge">Merge</button>
+      </div>
+    </div>
+    <button class="ctx-item" data-action="describe">Add Description</button>
+    <div class="ctx-divider"></div>
+    <button class="ctx-item ctx-danger" data-action="delete">Delete</button>
   </div>
 
   <!-- ============ Export loading overlay ============ -->
