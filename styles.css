@@ -60,12 +60,19 @@ body {
   font-size: 1.9rem;
   font-weight: 800;
   letter-spacing: 1px;
-  background: linear-gradient(90deg, var(--primary), var(--accent) 50%, var(--secondary));
+  background: linear-gradient(90deg, var(--primary), var(--accent) 40%, var(--secondary), var(--accent) 60%, var(--primary));
+  background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
   text-shadow: 0 0 30px rgba(0, 255, 136, 0.25);
+  animation: title-shimmer 8s linear infinite;
+}
+
+@keyframes title-shimmer {
+  from { background-position: 0% 50%; }
+  to { background-position: 200% 50%; }
 }
 
 .subtitle {

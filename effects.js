@@ -359,3 +359,98 @@
   bindToggle("toggle-particles", enableParticles, disableParticles, "particle background");
   bindToggle("toggle-three", enableThree, disableThree, "3D background");
 })();
+
+/* ============================================================
+   Lottie overlay animations — export spinner & success check.
+   Animation data is embedded so no extra network fetch is needed.
+   Returns true from FX.overlayAnimation when Lottie handled it,
+   letting export.js fall back to a CSS spinner otherwise.
+   ============================================================ */
+
+(function initLottie() {
+  const FX = window.FX;
+
+  const green = [0, 1, 0.533, 1];
+
+  const spinnerAnim = {
+    v: "5.7.4", fr: 60, ip: 0, op: 60, w: 100, h: 100, nm: "spinner", ddd: 0, assets: [],
+    layers: [{
+      ddd: 0, ind: 1, ty: 4, nm: "arc", sr: 1,
+      ks: {
+        o: { a: 0, k: 100 },
+        r: { a: 1, k: [{ t: 0, s: [0], e: [360], i: { x: [0.5], y: [0.5] }, o: { x: [0.5], y: [0.5] } }, { t: 60, s: [360] }] },
+        p: { a: 0, k: [50, 50, 0] },
+        a: { a: 0, k: [0, 0, 0] },
+        s: { a: 0, k: [100, 100, 100] },
+      },
+      shapes: [{
+        ty: "gr",
+        it: [
+          { ty: "el", p: { a: 0, k: [0, 0] }, s: { a: 0, k: [64, 64] } },
+          { ty: "tm", s: { a: 0, k: 0 }, e: { a: 0, k: 72 }, o: { a: 0, k: 0 }, m: 1 },
+          { ty: "st", c: { a: 0, k: green }, o: { a: 0, k: 100 }, w: { a: 0, k: 7 }, lc: 2, lj: 2 },
+          { ty: "tr", p: { a: 0, k: [0, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } },
+        ],
+      }],
+      ip: 0, op: 60, st: 0,
+    }],
+  };
+
+  const successAnim = {
+    v: "5.7.4", fr: 60, ip: 0, op: 50, w: 100, h: 100, nm: "success", ddd: 0, assets: [],
+    layers: [
+      {
+        ddd: 0, ind: 1, ty: 4, nm: "circle", sr: 1,
+        ks: { o: { a: 0, k: 100 }, r: { a: 0, k: 0 }, p: { a: 0, k: [50, 50, 0] }, a: { a: 0, k: [0, 0, 0] }, s: { a: 0, k: [100, 100, 100] } },
+        shapes: [{
+          ty: "gr",
+          it: [
+            { ty: "el", p: { a: 0, k: [0, 0] }, s: { a: 0, k: [76, 76] } },
+            { ty: "tm", s: { a: 0, k: 0 }, e: { a: 1, k: [{ t: 0, s: [0], e: [100], i: { x: [0.3], y: [1] }, o: { x: [0.7], y: [0] } }, { t: 22, s: [100] }] }, o: { a: 0, k: 0 }, m: 1 },
+            { ty: "st", c: { a: 0, k: green }, o: { a: 0, k: 100 }, w: { a: 0, k: 6 }, lc: 2, lj: 2 },
+            { ty: "tr", p: { a: 0, k: [0, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } },
+          ],
+        }],
+        ip: 0, op: 50, st: 0,
+      },
+      {
+        ddd: 0, ind: 2, ty: 4, nm: "check", sr: 1,
+        ks: { o: { a: 0, k: 100 }, r: { a: 0, k: 0 }, p: { a: 0, k: [50, 52, 0] }, a: { a: 0, k: [0, 0, 0] }, s: { a: 0, k: [100, 100, 100] } },
+        shapes: [{
+          ty: "gr",
+          it: [
+            { ty: "sh", ks: { a: 0, k: { c: false, v: [[-16, 0], [-5, 11], [17, -13]], i: [[0, 0], [0, 0], [0, 0]], o: [[0, 0], [0, 0], [0, 0]] } } },
+            { ty: "tm", s: { a: 0, k: 0 }, e: { a: 1, k: [{ t: 14, s: [0], e: [100], i: { x: [0.3], y: [1] }, o: { x: [0.7], y: [0] } }, { t: 32, s: [100] }] }, o: { a: 0, k: 0 }, m: 1 },
+            { ty: "st", c: { a: 0, k: green }, o: { a: 0, k: 100 }, w: { a: 0, k: 8 }, lc: 2, lj: 2 },
+            { ty: "tr", p: { a: 0, k: [0, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } },
+          ],
+        }],
+        ip: 0, op: 50, st: 0,
+      },
+    ],
+  };
+
+  let instance = null;
+
+  function destroyInstance() {
+    if (instance) {
+      instance.destroy();
+      instance = null;
+    }
+  }
+
+  FX.overlayAnimation = function (container, kind) {
+    if (typeof window.lottie === "undefined") return false;
+    destroyInstance();
+    if (kind === "stop") return true;
+    container.innerHTML = "";
+    instance = window.lottie.loadAnimation({
+      container,
+      renderer: "svg",
+      loop: kind === "loading",
+      autoplay: true,
+      animationData: kind === "loading" ? spinnerAnim : successAnim,
+    });
+    return true;
+  };
+})();
