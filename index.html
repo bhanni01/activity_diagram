@@ -158,9 +158,20 @@
         </div>
         <h2 class="panel-title">Connected Elements</h2>
         <div id="prop-connections" class="conn-list"></div>
+        <div id="prop-hint" class="props-hint" hidden></div>
         <div class="props-buttons">
           <button id="prop-duplicate" class="btn action-btn" title="Create a copy of this element">Duplicate</button>
           <button id="prop-delete" class="btn danger-btn" title="Delete this element and its connections">Delete</button>
+        </div>
+      </div>
+      <div id="conn-editor" class="props-editor" hidden>
+        <div id="conn-endpoints" class="conn-endpoints"></div>
+        <label class="field-label" for="conn-label">Arrow label</label>
+        <input id="conn-label" class="text-input" type="text" maxlength="40" placeholder="e.g. Yes, No, Error" />
+        <div class="props-hint">Branch outcomes like Yes / No appear on the arrow. Decisions label their first two branches automatically.</div>
+        <div class="props-buttons">
+          <button id="conn-reverse" class="btn action-btn" title="Flip the flow direction of this connection">Reverse</button>
+          <button id="conn-delete" class="btn danger-btn" title="Remove this connection">Delete</button>
         </div>
       </div>
     </aside>
@@ -190,6 +201,10 @@
       </div>
       <label class="field-label" for="create-label">Label</label>
       <input id="create-label" class="text-input" type="text" maxlength="80" />
+      <label class="toggle-row" id="create-connect-row" hidden>
+        <input id="create-connect" type="checkbox" checked />
+        <span id="create-connect-text">Connect from selected</span>
+      </label>
       <div class="modal-actions">
         <button id="create-cancel" class="btn action-btn">Cancel</button>
         <button id="create-confirm" class="btn export-btn">Create</button>
@@ -240,6 +255,14 @@ End: Done"></textarea>
       </div>
     </div>
     <button class="ctx-item" data-action="describe">Add Description</button>
+    <div class="ctx-divider"></div>
+    <button class="ctx-item ctx-danger" data-action="delete">Delete</button>
+  </div>
+
+  <!-- Context menu for connections -->
+  <div id="conn-context-menu" class="context-menu" hidden>
+    <button class="ctx-item" data-action="label">Edit Label</button>
+    <button class="ctx-item" data-action="reverse">Reverse Direction</button>
     <div class="ctx-divider"></div>
     <button class="ctx-item ctx-danger" data-action="delete">Delete</button>
   </div>

@@ -7,7 +7,9 @@ A self-project tool for designing UML activity diagrams in the browser — a sta
 ## Features
 
 - **Five element types** — Start (circle), End (double circle), Activity (rounded rectangle), Decision (diamond), Merge (diamond)
-- **Named creation dialog** — click an element button, type its label, and it lands on a free spot on the canvas
+- **Named creation dialog** — click an element button, type its label, and it lands on a free spot on the canvas; with an element selected it can auto-connect from it
+- **Smart branch labels** — a Decision's first two outgoing arrows are labeled **Yes** / **No** automatically (then Option 3, …); double-click any arrow to rename, right-click to reverse or delete
+- **Modeling hints** — the panel nudges you when a Decision has fewer than two branches, an Activity forks, a Merge has one input, a Start/End is unconnected, etc.
 - **Drag-and-drop canvas** — drag to move, drag between ports to connect with directional arrows, double-click to rename inline
 - **Full properties form** — name, type, description, live coordinates, size controls, duplicate/delete, and a clickable list of connected elements
 - **Bulk import** — paste `Type: Label` lines to create a whole workflow at once, auto-connected and auto-laid-out
@@ -37,7 +39,7 @@ Opening `index.html` directly also works for everything except PDF export (raste
 1. **Add elements** — click a button in the left toolbar (e.g. *Activity*), type a label in the dialog, and press **Enter** or *Create*. The element appears on a free spot and is selected.
 2. **Move elements** — drag any element to reposition it. Connections follow automatically.
 3. **Rename inline** — double-click an element, type the new label, press **Enter** (Escape cancels).
-4. **Connect elements** — hover an element to reveal its four ports (small dots on the edges). Drag from a port onto another element to create an arrow in that flow direction. Invalid connections (into a Start, out of an End, duplicates, self-loops) are rejected with a message.
+4. **Connect elements** — hover an element to reveal its four ports (small dots on the edges). Drag from a port onto another element to create an arrow in that flow direction. Invalid connections (into a Start, out of an End, duplicates, self-loops) are rejected with a message. Arrows leaving a Decision are labeled **Yes**, **No**, then **Option 3**… automatically — double-click an arrow (or select it) to change the label, and use the arrow's panel or right-click menu to reverse or delete it. The fastest way to build a flow: keep the last element selected and create the next one with "Connect from" checked.
 5. **Edit properties** — click an element to select it. The right panel edits its name, type, description and size, shows live coordinates, lists connected elements (click to jump, × to disconnect), and has Duplicate/Delete buttons. Every change updates the canvas immediately.
 6. **Right-click** — the context menu offers Edit Label, Duplicate, Change Type, Add Description, and Delete.
 7. **Bulk import** — click *Bulk Import* and paste one element per line, e.g. `Activity: Validate Input` or `Decision: Is Valid?` (lines without a type become activities). Elements are created, optionally auto-connected in sequence, and auto-laid-out.

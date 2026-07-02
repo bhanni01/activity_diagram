@@ -180,21 +180,38 @@ function anchorPoint(el, tx, ty) {
   return { x: el.x + ux * s, y: el.y + uy * s };
 }
 
-/** SVG path `d` for a connection between two elements (gentle curve). */
-function connectionPath(fromEl, toEl) {
+/** Path `d` and midpoint for a connection between two elements (gentle curve). */
+function connectionGeometry(fromEl, toEl) {
   const from = anchorPoint(fromEl, toEl.x, toEl.y);
   const to = anchorPoint(toEl, fromEl.x, fromEl.y);
   const dx = to.x - from.x;
   const dy = to.y - from.y;
+  let c1;
+  let c2;
   if (Math.abs(dy) >= Math.abs(dx)) {
     // Mostly vertical flow — curve through vertical control points.
     const bend = Math.min(60, Math.abs(dy) / 2);
     const sign = dy >= 0 ? 1 : -1;
-    return `M ${from.x},${from.y} C ${from.x},${from.y + sign * bend} ${to.x},${to.y - sign * bend} ${to.x},${to.y}`;
+    c1 = { x: from.x, y: from.y + sign * bend };
+    c2 = { x: to.x, y: to.y - sign * bend };
+  } else {
+    const bend = Math.min(60, Math.abs(dx) / 2);
+    const sign = dx >= 0 ? 1 : -1;
+    c1 = { x: from.x + sign * bend, y: from.y };
+    c2 = { x: to.x - sign * bend, y: to.y };
   }
-  const bend = Math.min(60, Math.abs(dx) / 2);
-  const sign = dx >= 0 ? 1 : -1;
-  return `M ${from.x},${from.y} C ${from.x + sign * bend},${from.y} ${to.x - sign * bend},${to.y} ${to.x},${to.y}`;
+  return {
+    d: `M ${from.x},${from.y} C ${c1.x},${c1.y} ${c2.x},${c2.y} ${to.x},${to.y}`,
+    // Cubic bezier evaluated at t = 0.5 — where the arrow label sits.
+    mid: {
+      x: (from.x + 3 * c1.x + 3 * c2.x + to.x) / 8,
+      y: (from.y + 3 * c1.y + 3 * c2.y + to.y) / 8,
+    },
+  };
+}
+
+function connectionPath(fromEl, toEl) {
+  return connectionGeometry(fromEl, toEl).d;
 }
 
 /**

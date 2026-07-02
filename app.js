@@ -35,17 +35,31 @@ const dom = {
   propIn: document.getElementById("prop-in"),
   propOut: document.getElementById("prop-out"),
   propConnections: document.getElementById("prop-connections"),
+  propHint: document.getElementById("prop-hint"),
   propDuplicate: document.getElementById("prop-duplicate"),
   propDelete: document.getElementById("prop-delete"),
+  connEditor: document.getElementById("conn-editor"),
+  connEndpoints: document.getElementById("conn-endpoints"),
+  connLabel: document.getElementById("conn-label"),
+  connReverse: document.getElementById("conn-reverse"),
+  connDelete: document.getElementById("conn-delete"),
   toast: document.getElementById("toast"),
   createModal: document.getElementById("create-modal"),
   createTitle: document.getElementById("create-modal-title"),
   createLabel: document.getElementById("create-label"),
+  createConnectRow: document.getElementById("create-connect-row"),
+  createConnect: document.getElementById("create-connect"),
+  createConnectText: document.getElementById("create-connect-text"),
   bulkModal: document.getElementById("bulk-modal"),
   bulkText: document.getElementById("bulk-text"),
   bulkConnect: document.getElementById("bulk-connect"),
   contextMenu: document.getElementById("context-menu"),
+  connContextMenu: document.getElementById("conn-context-menu"),
 };
+
+function getConnection(id) {
+  return state.connections.find((c) => c.id === id);
+}
 
 /* Dispatch to optional visual-effects hooks (defined in effects.js). */
 function fx(name, ...args) {
@@ -228,6 +242,19 @@ function validateConnection(fromId, toId) {
   return null;
 }
 
+/**
+ * Default label for a new outgoing connection. Decision branches get
+ * Yes / No for the first two, then "Option 3", "Option 4", …
+ */
+function defaultConnectionLabel(fromId) {
+  const from = getElement(fromId);
+  if (!from || from.type !== "decision") return "";
+  const existing = state.connections.filter((c) => c.from === fromId).length;
+  if (existing === 0) return "Yes";
+  if (existing === 1) return "No";
+  return `Option ${existing + 1}`;
+}
+
 function addConnection(fromId, toId, opts) {
   const options = opts || {};
   const error = validateConnection(fromId, toId);
@@ -236,12 +263,38 @@ function addConnection(fromId, toId, opts) {
     return null;
   }
   if (options.history !== false) pushHistory();
-  const conn = { id: nextId("conn"), from: fromId, to: toId };
+  const label = options.label !== undefined ? options.label : defaultConnectionLabel(fromId);
+  const conn = { id: nextId("conn"), from: fromId, to: toId, label };
   state.connections.push(conn);
   const node = renderConnection(conn);
   fx("connectionAdded", node.querySelector(".conn-path"));
   refreshProps();
+  if (!options.silent) {
+    const from = getElement(fromId);
+    const outbound = state.connections.filter((c) => c.from === fromId).length;
+    if (label) {
+      showToast(`Branch labeled "${label}" — double-click the arrow to rename it.`);
+    } else if (from && from.type === "activity" && outbound === 2) {
+      showToast("Tip: multiple branches from an Activity — a Decision might fit better.");
+    } else if (from && from.type === "start" && outbound === 2) {
+      showToast("Tip: a Start usually has a single outgoing flow.");
+    }
+  }
   return conn;
+}
+
+function reverseConnection(conn) {
+  const error = validateConnection(conn.to, conn.from);
+  if (error) {
+    showToast(error, true);
+    return;
+  }
+  pushHistory();
+  const from = conn.from;
+  conn.from = conn.to;
+  conn.to = from;
+  renderConnection(conn);
+  refreshProps();
 }
 
 function removeConnection(id, opts) {
@@ -341,17 +394,47 @@ function renderElement(el) {
   return group;
 }
 
+function buildConnLabel(conn, mid) {
+  const g = svgEl("g", { class: "conn-label-g", transform: `translate(${mid.x}, ${mid.y})` });
+  const width = Math.max(28, conn.label.length * 6.6 + 14);
+  g.appendChild(
+    svgEl("rect", {
+      x: -width / 2,
+      y: -10,
+      width,
+      height: 20,
+      rx: 9,
+      fill: "#0a0e27",
+      "fill-opacity": 0.92,
+      stroke: "#00d9ff",
+      "stroke-opacity": 0.6,
+      "stroke-width": 1,
+    })
+  );
+  const text = svgEl("text", {
+    "text-anchor": "middle",
+    y: 4,
+    "font-size": 11,
+    "font-weight": 600,
+    fill: "#e0e0e0",
+  });
+  text.textContent = conn.label;
+  g.appendChild(text);
+  return g;
+}
+
 function renderConnection(conn) {
   let group = connectionNode(conn.id);
   if (group) group.remove();
   const from = getElement(conn.from);
   const to = getElement(conn.to);
   if (!from || !to) return null;
-  const d = connectionPath(from, to);
+  const geo = connectionGeometry(from, to);
   group = svgEl("g", { "data-id": conn.id });
   group.classList.add("connection");
-  group.appendChild(svgEl("path", { class: "conn-hit", d }));
-  group.appendChild(svgEl("path", { class: "conn-path", d, "marker-end": "url(#arrowhead)" }));
+  group.appendChild(svgEl("path", { class: "conn-hit", d: geo.d }));
+  group.appendChild(svgEl("path", { class: "conn-path", d: geo.d, "marker-end": "url(#arrowhead)" }));
+  if (conn.label) group.appendChild(buildConnLabel(conn, geo.mid));
   if (conn.id === state.selectedId) group.classList.add("selected");
   dom.layerConnections.appendChild(group);
   return group;
@@ -376,8 +459,10 @@ function updateConnectionPath(conn) {
   const from = getElement(conn.from);
   const to = getElement(conn.to);
   if (!node || !from || !to) return;
-  const d = connectionPath(from, to);
-  for (const path of node.querySelectorAll("path")) path.setAttribute("d", d);
+  const geo = connectionGeometry(from, to);
+  for (const path of node.querySelectorAll("path")) path.setAttribute("d", geo.d);
+  const labelG = node.querySelector(".conn-label-g");
+  if (labelG) labelG.setAttribute("transform", `translate(${geo.mid.x}, ${geo.mid.y})`);
 }
 
 function updateAllConnections() {
@@ -420,16 +505,43 @@ function updateCoordDisplay(el) {
   dom.propY.value = Math.round(el.y);
 }
 
+/** Per-type modeling tips shown in the properties panel. */
+function elementHint(el, inbound, outbound) {
+  switch (el.type) {
+    case "decision":
+      if (outbound < 2) {
+        return "A Decision usually has 2+ outgoing branches — the first two are auto-labeled Yes / No (double-click an arrow to rename).";
+      }
+      break;
+    case "start":
+      if (!outbound) return "Connect the Start to the first step: drag from one of its ports.";
+      if (outbound > 1) return "A Start usually has a single outgoing flow.";
+      break;
+    case "activity":
+      if (outbound > 1) return "Multiple branches from an Activity — a Decision might express this better.";
+      break;
+    case "merge":
+      if (inbound < 2) return "A Merge usually joins 2+ incoming branches back into one flow.";
+      break;
+    case "end":
+      if (!inbound) return "Nothing flows into this End yet — connect a final step to it.";
+      break;
+  }
+  return "";
+}
+
 function refreshProps() {
   const el = state.selectedId ? getElement(state.selectedId) : null;
-  dom.propsEmpty.hidden = !!el;
+  const conn = !el && state.selectedId ? getConnection(state.selectedId) : null;
+  dom.propsEmpty.hidden = !!(el || conn);
   dom.propsEditor.hidden = !el;
+  dom.connEditor.hidden = !conn;
+  if (conn) {
+    refreshConnProps(conn);
+    return;
+  }
   if (!el) {
-    if (state.selectedId) {
-      dom.propsEmpty.textContent = "Connection selected — press Delete/Backspace to remove it.";
-    } else {
-      dom.propsEmpty.textContent = "Select an element to edit its properties.";
-    }
+    dom.propsEmpty.textContent = "Select an element or arrow to edit it.";
     return;
   }
   if (document.activeElement !== dom.propLabel) dom.propLabel.value = el.label;
@@ -442,6 +554,32 @@ function refreshProps() {
   dom.propIn.textContent = inbound;
   dom.propOut.textContent = outbound;
   renderConnectionList(el);
+  const hint = elementHint(el, inbound, outbound);
+  dom.propHint.hidden = !hint;
+  dom.propHint.textContent = hint;
+}
+
+function refreshConnProps(conn) {
+  const from = getElement(conn.from);
+  const to = getElement(conn.to);
+  dom.connEndpoints.textContent = "";
+  const fromSpan = document.createElement("span");
+  fromSpan.textContent = `"${from ? from.label : "?"}"`;
+  const arrow = document.createElement("span");
+  arrow.className = "conn-arrow";
+  arrow.textContent = " → ";
+  const toSpan = document.createElement("span");
+  toSpan.textContent = `"${to ? to.label : "?"}"`;
+  dom.connEndpoints.append(fromSpan, arrow, toSpan);
+  if (document.activeElement !== dom.connLabel) dom.connLabel.value = conn.label || "";
+}
+
+function applyConnLabelChange() {
+  const conn = state.selectedId ? getConnection(state.selectedId) : null;
+  if (!conn) return;
+  pushHistory(`connlabel:${conn.id}`);
+  conn.label = dom.connLabel.value.trim();
+  renderConnection(conn);
 }
 
 function renderConnectionList(el) {
@@ -468,7 +606,7 @@ function renderConnectionList(el) {
 
     const label = document.createElement("span");
     label.className = "conn-label";
-    label.textContent = other.label;
+    label.textContent = conn.label ? `${other.label} (${conn.label})` : other.label;
 
     const remove = document.createElement("button");
     remove.className = "conn-remove";
@@ -518,11 +656,23 @@ function applySizeChange(dimension, input) {
 /* ---------------- Element creation dialog ---------------- */
 
 let pendingCreateType = null;
+let pendingCreateSource = null;
 
 function openCreateModal(type) {
   pendingCreateType = type;
   dom.createTitle.textContent = `New ${ElementTypes[type].name}`;
   dom.createLabel.value = ElementTypes[type].defaultLabel;
+
+  // Offer to auto-connect from the currently selected element.
+  const source = state.selectedId ? getElement(state.selectedId) : null;
+  const canConnect = !!source && source.type !== "end" && type !== "start";
+  pendingCreateSource = canConnect ? source.id : null;
+  dom.createConnectRow.hidden = !canConnect;
+  if (canConnect) {
+    dom.createConnect.checked = true;
+    dom.createConnectText.textContent = `Connect from "${source.label}"`;
+  }
+
   dom.createModal.hidden = false;
   fx("modalOpened", dom.createModal);
   dom.createLabel.focus();
@@ -532,21 +682,24 @@ function openCreateModal(type) {
 function closeCreateModal() {
   dom.createModal.hidden = true;
   pendingCreateType = null;
+  pendingCreateSource = null;
 }
 
-/** A spot near the canvas center that doesn't sit on an existing element. */
-function freePlacementPoint() {
+/** A free spot near `preferred` (or the canvas center) not covering an element. */
+function freePlacementPoint(preferred) {
   const rect = dom.canvas.getBoundingClientRect();
-  let x = Math.max(120, rect.width / 2);
-  let y = Math.max(100, rect.height / 2);
+  const clampX = (v) => Math.min(Math.max(v, 100), Math.max(rect.width - 100, 120));
+  const clampY = (v) => Math.min(Math.max(v, 80), Math.max(rect.height - 70, 100));
+  let x = clampX(preferred ? preferred.x : rect.width / 2);
+  let y = clampY(preferred ? preferred.y : rect.height / 2);
   const occupied = (px, py) =>
     state.elements.some((e) => Math.abs(e.x - px) < 60 && Math.abs(e.y - py) < 50);
   let tries = 0;
   while (occupied(x, y) && tries++ < 60) {
-    x += 40;
-    y += 34;
-    if (x > rect.width - 90) x = 120;
-    if (y > rect.height - 70) y = 90;
+    x = clampX(x + 40);
+    y = clampY(y + 34);
+    if (x >= rect.width - 100) x = 120;
+    if (y >= rect.height - 72) y = 90;
   }
   return { x, y };
 }
@@ -555,31 +708,37 @@ function confirmCreate() {
   if (!pendingCreateType) return;
   const type = pendingCreateType;
   const label = dom.createLabel.value.trim() || ElementTypes[type].defaultLabel;
+  const sourceId = pendingCreateSource && dom.createConnect.checked ? pendingCreateSource : null;
   closeCreateModal();
   pushHistory();
-  const pos = freePlacementPoint();
+  const source = sourceId ? getElement(sourceId) : null;
+  // Land below the source when connecting, so the flow reads top-to-bottom.
+  const pos = freePlacementPoint(source ? { x: source.x, y: source.y + 150 } : null);
   const el = addElement(type, pos.x, pos.y, label);
+  if (source) addConnection(source.id, el.id, { history: false });
   selectItem(el.id);
+  if (type === "start" && state.elements.filter((e) => e.type === "start").length > 1) {
+    showToast("Note: activity diagrams usually have a single Start.");
+  }
 }
 
 /* ---------------- Inline label editing (double-click) ---------------- */
 
-let inlineEdit = null; // { input, elementId }
+let inlineEdit = null; // { input, onSave }
 
-function startInlineEdit(el) {
+function openInlineInput(x, y, width, value, onSave) {
   cancelInlineEdit();
   hideTooltip();
   const input = document.createElement("input");
   input.className = "inline-edit";
   input.type = "text";
   input.maxLength = 80;
-  input.value = el.label;
-  const width = Math.max(el.w, 120);
-  input.style.left = `${el.x - width / 2}px`;
-  input.style.top = `${el.y - 16}px`;
+  input.value = value;
+  input.style.left = `${x - width / 2}px`;
+  input.style.top = `${y - 16}px`;
   input.style.width = `${width}px`;
   dom.canvasWrap.appendChild(input);
-  inlineEdit = { input, elementId: el.id };
+  inlineEdit = { input, onSave };
   input.focus();
   input.select();
   input.addEventListener("keydown", (evt) => {
@@ -590,20 +749,41 @@ function startInlineEdit(el) {
   input.addEventListener("blur", saveInlineEdit);
 }
 
+function startInlineEdit(el) {
+  openInlineInput(el.x, el.y, Math.max(el.w, 120), el.label, (raw) => {
+    const target = getElement(el.id);
+    if (!target) return;
+    const value = raw.trim() || ElementTypes[target.type].defaultLabel;
+    if (value === target.label) return;
+    pushHistory();
+    target.label = value;
+    renderElement(target);
+    refreshProps();
+  });
+}
+
+function startConnLabelEdit(conn) {
+  const from = getElement(conn.from);
+  const to = getElement(conn.to);
+  if (!from || !to) return;
+  const mid = connectionGeometry(from, to).mid;
+  openInlineInput(mid.x, mid.y, 110, conn.label || "", (raw) => {
+    const target = getConnection(conn.id);
+    if (!target) return;
+    const value = raw.trim();
+    if (value === (target.label || "")) return;
+    pushHistory();
+    target.label = value;
+    renderConnection(target);
+    refreshProps();
+  });
+}
+
 function saveInlineEdit() {
   if (!inlineEdit) return;
-  const { input, elementId } = inlineEdit;
+  const { input, onSave } = inlineEdit;
   inlineEdit = null;
-  const el = getElement(elementId);
-  if (el) {
-    const value = input.value.trim() || ElementTypes[el.type].defaultLabel;
-    if (value !== el.label) {
-      pushHistory();
-      el.label = value;
-      renderElement(el);
-      refreshProps();
-    }
-  }
+  onSave(input.value);
   input.remove();
 }
 
@@ -618,22 +798,34 @@ function cancelInlineEdit() {
 
 let contextTargetId = null;
 
-function openContextMenu(evt, elementId) {
-  contextTargetId = elementId;
-  selectItem(elementId);
-  const menu = dom.contextMenu;
+function positionContextMenu(menu, evt) {
   menu.hidden = false;
   const rect = menu.getBoundingClientRect();
   const x = Math.min(evt.clientX, window.innerWidth - rect.width - 8);
   const y = Math.min(evt.clientY, window.innerHeight - rect.height - 8);
   menu.style.left = `${Math.max(4, x)}px`;
   menu.style.top = `${Math.max(4, y)}px`;
-  // Flip the type submenu if it would run off the right edge.
+  // Flip any submenu if it would run off the right edge.
   menu.classList.toggle("submenu-left", x + rect.width + 130 > window.innerWidth);
+}
+
+function openContextMenu(evt, elementId) {
+  closeContextMenu();
+  contextTargetId = elementId;
+  selectItem(elementId);
+  positionContextMenu(dom.contextMenu, evt);
+}
+
+function openConnContextMenu(evt, connId) {
+  closeContextMenu();
+  contextTargetId = connId;
+  selectItem(connId);
+  positionContextMenu(dom.connContextMenu, evt);
 }
 
 function closeContextMenu() {
   dom.contextMenu.hidden = true;
+  dom.connContextMenu.hidden = true;
   contextTargetId = null;
 }
 
@@ -657,6 +849,23 @@ function handleContextAction(action, type) {
       break;
     case "delete":
       removeElement(el.id);
+      break;
+  }
+}
+
+function handleConnContextAction(action) {
+  const conn = contextTargetId ? getConnection(contextTargetId) : null;
+  closeContextMenu();
+  if (!conn) return;
+  switch (action) {
+    case "label":
+      startConnLabelEdit(conn);
+      break;
+    case "reverse":
+      reverseConnection(conn);
+      break;
+    case "delete":
+      removeConnection(conn.id);
       break;
   }
 }
@@ -812,43 +1021,74 @@ function onCanvasPointerUp(evt) {
 
 function onCanvasDoubleClick(evt) {
   const group = evt.target.closest ? evt.target.closest(".diagram-el") : null;
-  if (!group) return;
-  const el = getElement(group.dataset.id);
-  if (!el) return;
-  selectItem(el.id);
-  startInlineEdit(el);
+  if (group) {
+    const el = getElement(group.dataset.id);
+    if (!el) return;
+    selectItem(el.id);
+    startInlineEdit(el);
+    return;
+  }
+  const connGroup = evt.target.closest ? evt.target.closest(".connection") : null;
+  if (connGroup) {
+    const conn = getConnection(connGroup.dataset.id);
+    if (!conn) return;
+    selectItem(conn.id);
+    startConnLabelEdit(conn);
+  }
 }
 
 function onCanvasContextMenu(evt) {
   const group = evt.target.closest ? evt.target.closest(".diagram-el") : null;
-  if (!group) {
-    closeContextMenu();
+  if (group) {
+    evt.preventDefault();
+    hideTooltip();
+    openContextMenu(evt, group.dataset.id);
     return;
   }
-  evt.preventDefault();
-  hideTooltip();
-  openContextMenu(evt, group.dataset.id);
+  const connGroup = evt.target.closest ? evt.target.closest(".connection") : null;
+  if (connGroup) {
+    evt.preventDefault();
+    hideTooltip();
+    openConnContextMenu(evt, connGroup.dataset.id);
+    return;
+  }
+  closeContextMenu();
 }
 
 /* ---------------- Tooltip ---------------- */
 
 function updateTooltip(evt) {
-  const group = evt.target.closest ? evt.target.closest(".diagram-el") : null;
-  if (!group || inlineEdit) {
+  if (inlineEdit) {
     hideTooltip();
     return;
   }
-  const el = getElement(group.dataset.id);
-  if (!el) {
+  let text = null;
+  const group = evt.target.closest ? evt.target.closest(".diagram-el") : null;
+  const connGroup = !group && evt.target.closest ? evt.target.closest(".connection") : null;
+  if (group) {
+    const el = getElement(group.dataset.id);
+    if (el) {
+      text = `${el.label} — ${ElementTypes[el.type].name}`;
+      if (el.description) {
+        const desc = el.description.length > 90 ? `${el.description.slice(0, 90)}…` : el.description;
+        text += `\n${desc}`;
+      }
+    }
+  } else if (connGroup) {
+    const conn = getConnection(connGroup.dataset.id);
+    const from = conn && getElement(conn.from);
+    const to = conn && getElement(conn.to);
+    if (from && to) {
+      text = `${from.label} → ${to.label}`;
+      if (conn.label) text += ` — "${conn.label}"`;
+      text += "\nDouble-click to edit the label";
+    }
+  }
+  if (!text) {
     hideTooltip();
     return;
   }
   const wrapRect = dom.canvasWrap.getBoundingClientRect();
-  let text = `${el.label} — ${ElementTypes[el.type].name}`;
-  if (el.description) {
-    const desc = el.description.length > 90 ? `${el.description.slice(0, 90)}…` : el.description;
-    text += `\n${desc}`;
-  }
   dom.tooltip.textContent = text;
   dom.tooltip.hidden = false;
   dom.tooltip.style.left = `${evt.clientX - wrapRect.left + 14}px`;
@@ -885,7 +1125,7 @@ function onKeyDown(evt) {
   }
 
   if (evt.key === "Escape") {
-    if (!dom.contextMenu.hidden) {
+    if (!dom.contextMenu.hidden || !dom.connContextMenu.hidden) {
       closeContextMenu();
       return;
     }
@@ -929,11 +1169,11 @@ function loadSampleDiagram() {
   const error = addElement("activity", 0, 0, "Show Error");
   const end = addElement("end", 0, 0, "End");
   state.connections.push(
-    { id: nextId("conn"), from: start.id, to: validate.id },
-    { id: nextId("conn"), from: validate.id, to: process.id },
-    { id: nextId("conn"), from: validate.id, to: error.id },
-    { id: nextId("conn"), from: process.id, to: end.id },
-    { id: nextId("conn"), from: error.id, to: end.id }
+    { id: nextId("conn"), from: start.id, to: validate.id, label: "" },
+    { id: nextId("conn"), from: validate.id, to: process.id, label: "Yes" },
+    { id: nextId("conn"), from: validate.id, to: error.id, label: "No" },
+    { id: nextId("conn"), from: process.id, to: end.id, label: "" },
+    { id: nextId("conn"), from: error.id, to: end.id, label: "" }
   );
   const width = dom.canvas.getBoundingClientRect().width || 800;
   const positions = computeAutoLayout(state.elements, state.connections, width);
@@ -985,6 +1225,19 @@ function init() {
     if (state.selectedId && getElement(state.selectedId)) removeElement(state.selectedId);
   });
 
+  // Connection editor.
+  dom.connLabel.addEventListener("input", applyConnLabelChange);
+  dom.connLabel.addEventListener("keydown", (evt) => {
+    if (evt.key === "Enter") dom.connLabel.blur();
+  });
+  dom.connReverse.addEventListener("click", () => {
+    const conn = state.selectedId ? getConnection(state.selectedId) : null;
+    if (conn) reverseConnection(conn);
+  });
+  dom.connDelete.addEventListener("click", () => {
+    if (state.selectedId && getConnection(state.selectedId)) removeConnection(state.selectedId);
+  });
+
   // Create-element dialog.
   document.getElementById("create-confirm").addEventListener("click", confirmCreate);
   document.getElementById("create-cancel").addEventListener("click", closeCreateModal);
@@ -1007,13 +1260,18 @@ function init() {
     if (evt.target === dom.bulkModal) closeBulkModal();
   });
 
-  // Context menu.
+  // Context menus.
   dom.contextMenu.addEventListener("click", (evt) => {
     const item = evt.target.closest("[data-action]");
     if (item) handleContextAction(item.dataset.action, item.dataset.type);
   });
+  dom.connContextMenu.addEventListener("click", (evt) => {
+    const item = evt.target.closest("[data-action]");
+    if (item) handleConnContextAction(item.dataset.action);
+  });
   document.addEventListener("pointerdown", (evt) => {
-    if (!dom.contextMenu.hidden && !dom.contextMenu.contains(evt.target)) closeContextMenu();
+    const inMenu = dom.contextMenu.contains(evt.target) || dom.connContextMenu.contains(evt.target);
+    if ((!dom.contextMenu.hidden || !dom.connContextMenu.hidden) && !inMenu) closeContextMenu();
   });
 
   window.addEventListener("keydown", onKeyDown);

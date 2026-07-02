@@ -518,6 +518,37 @@ textarea.text-input {
   color: var(--secondary);
 }
 
+.props-hint {
+  margin-top: 12px;
+  padding: 8px 10px;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+  background: rgba(0, 217, 255, 0.06);
+  border: 1px solid rgba(0, 217, 255, 0.22);
+  border-radius: 8px;
+}
+
+.conn-endpoints {
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.conn-endpoints .conn-arrow {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.connection.selected .conn-label-g rect {
+  stroke: var(--primary);
+  stroke-opacity: 1;
+}
+
 .props-buttons {
   display: flex;
   gap: 8px;

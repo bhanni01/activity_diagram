@@ -20,7 +20,7 @@ function diagramFingerprint() {
     elements: state.elements.map((e) => [
       e.id, e.type, e.label, e.description || "", Math.round(e.x), Math.round(e.y), e.w, e.h,
     ]),
-    connections: state.connections.map((c) => [c.from, c.to]),
+    connections: state.connections.map((c) => [c.from, c.to, c.label || ""]),
   });
 }
 
@@ -276,7 +276,8 @@ function generatePrompt() {
     const from = byId.get(conn.from);
     const to = byId.get(conn.to);
     if (!from || !to) continue;
-    lines.push(`- "${from.label}" (${from.type}) --> "${to.label}" (${to.type})`);
+    const arrow = conn.label ? `--[${conn.label}]-->` : "-->";
+    lines.push(`- "${from.label}" (${from.type}) ${arrow} "${to.label}" (${to.type})`);
   }
   lines.push("");
   lines.push("## Semantics");
@@ -286,6 +287,7 @@ function generatePrompt() {
   lines.push("- activity: a concrete action or processing step to implement.");
   lines.push("- decision: a conditional branch; each outgoing connection is one possible outcome.");
   lines.push("- merge: converging branches rejoin into a single flow.");
+  lines.push("- Arrow labels in [brackets] are branch conditions or outcomes (e.g. [Yes], [No]).");
   lines.push("");
   lines.push("## Instructions for the agent");
   lines.push("");
