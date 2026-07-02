@@ -378,6 +378,17 @@ select.text-input option {
   filter: drop-shadow(0 0 10px var(--accent));
 }
 
+/* Spark particles emitted on element placement/selection */
+.spark {
+  position: absolute;
+  z-index: 5;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate3d(-50%, -50%, 0);
+}
+
 /* ---------- Tooltip ---------- */
 .tooltip {
   position: absolute;
