@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Activity Diagram Creator</title>
+  <meta name="description" content="Create, edit and export UML activity diagrams with a drag-and-drop canvas, PDF export and AI prompt generation." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Optional animated backgrounds (lazy-initialized) -->
+  <div id="particles-bg" aria-hidden="true"></div>
+  <div id="three-bg" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <h1 class="title">Activity Diagram Creator</h1>
+    <p class="subtitle">Design workflows visually &mdash; export as PDF or AI-ready prompts</p>
+  </header>
+
+  <main class="app">
+    <!-- ============ Left toolbar ============ -->
+    <aside class="toolbar panel" aria-label="Toolbar">
+      <h2 class="panel-title">Elements</h2>
+      <div class="tool-group">
+        <button class="btn tool-btn" data-tool="start" title="Start node — the entry point of the workflow (circle)">
+          <span class="tool-icon icon-start"></span> Start
+        </button>
+        <button class="btn tool-btn" data-tool="end" title="End node — the exit point of the workflow (circle)">
+          <span class="tool-icon icon-end"></span> End
+        </button>
+        <button class="btn tool-btn" data-tool="activity" title="Activity — an action or task (rounded rectangle)">
+          <span class="tool-icon icon-activity"></span> Activity
+        </button>
+        <button class="btn tool-btn" data-tool="decision" title="Decision — a branching point (diamond)">
+          <span class="tool-icon icon-decision"></span> Decision
+        </button>
+        <button class="btn tool-btn" data-tool="merge" title="Merge — joins branches back together (diamond)">
+          <span class="tool-icon icon-merge"></span> Merge
+        </button>
+      </div>
+
+      <h2 class="panel-title">Actions</h2>
+      <div class="tool-group">
+        <button id="btn-clear" class="btn action-btn" title="Remove all elements and connections from the canvas">Clear All</button>
+        <button id="btn-layout" class="btn action-btn" title="Automatically arrange elements top-to-bottom by flow">Auto Layout</button>
+      </div>
+
+      <h2 class="panel-title">Export</h2>
+      <div class="tool-group">
+        <button id="btn-pdf" class="btn export-btn" title="Export the diagram as a PDF document">Export PDF</button>
+        <button id="btn-prompt" class="btn export-btn" title="Generate an AI agent prompt describing this diagram">Export Prompt</button>
+      </div>
+
+      <h2 class="panel-title">Settings</h2>
+      <div class="tool-group settings-group">
+        <label class="field-label" for="diagram-name">Diagram name</label>
+        <input id="diagram-name" class="text-input" type="text" value="My Workflow" maxlength="60" />
+        <label class="toggle-row" title="Toggle the interactive particle background">
+          <input id="toggle-particles" type="checkbox" />
+          <span>Particle background</span>
+        </label>
+        <label class="toggle-row" title="Toggle the 3D geometric background">
+          <input id="toggle-three" type="checkbox" />
+          <span>3D background</span>
+        </label>
+      </div>
+
+      <div class="help-text">
+        <p><strong>How to use:</strong></p>
+        <p>1. Pick an element, then click the canvas to place it.</p>
+        <p>2. Drag elements to move them.</p>
+        <p>3. Hover an element and drag from a port (small dot) to another element to connect them.</p>
+        <p>4. Click an element to edit it in the right panel.</p>
+      </div>
+    </aside>
+
+    <!-- ============ Canvas ============ -->
+    <section class="canvas-wrap" aria-label="Diagram canvas">
+      <svg id="canvas" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0 L10,4 L0,8 Z" fill="#00d9ff"></path>
+          </marker>
+          <linearGradient id="grad-start" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#00ff88"></stop>
+            <stop offset="100%" stop-color="#00b86b"></stop>
+          </linearGradient>
+          <linearGradient id="grad-end" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ff006e"></stop>
+            <stop offset="100%" stop-color="#b8004f"></stop>
+          </linearGradient>
+          <linearGradient id="grad-activity" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#123a5c"></stop>
+            <stop offset="100%" stop-color="#0d2038"></stop>
+          </linearGradient>
+          <linearGradient id="grad-decision" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#3d1d5c"></stop>
+            <stop offset="100%" stop-color="#22103a"></stop>
+          </linearGradient>
+          <linearGradient id="grad-merge" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1d4a5c"></stop>
+            <stop offset="100%" stop-color="#0f2a38"></stop>
+          </linearGradient>
+          <filter id="neon-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#00ff88" flood-opacity="0.9"></feDropShadow>
+          </filter>
+        </defs>
+        <g id="layer-connections"></g>
+        <g id="layer-elements"></g>
+        <g id="layer-overlay"></g>
+      </svg>
+      <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+    </section>
+
+    <!-- ============ Properties panel ============ -->
+    <aside class="properties panel" aria-label="Properties">
+      <h2 class="panel-title">Properties</h2>
+      <div id="props-empty" class="props-empty">Select an element to edit its properties.</div>
+      <div id="props-editor" class="props-editor" hidden>
+        <label class="field-label" for="prop-label">Label</label>
+        <input id="prop-label" class="text-input" type="text" maxlength="80" />
+        <label class="field-label" for="prop-type">Type</label>
+        <select id="prop-type" class="text-input">
+          <option value="start">Start</option>
+          <option value="end">End</option>
+          <option value="activity">Activity</option>
+          <option value="decision">Decision</option>
+          <option value="merge">Merge</option>
+        </select>
+        <div class="conn-indicators">
+          <div class="conn-row"><span class="conn-dot in"></span> Incoming: <span id="prop-in">0</span></div>
+          <div class="conn-row"><span class="conn-dot out"></span> Outgoing: <span id="prop-out">0</span></div>
+        </div>
+        <button id="prop-delete" class="btn danger-btn" title="Delete this element and its connections">Delete Element</button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ============ Prompt export modal ============ -->
+  <div id="prompt-modal" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="prompt-modal-title">
+      <div class="modal-header">
+        <h3 id="prompt-modal-title">AI Agent Prompt</h3>
+        <button id="prompt-close" class="btn icon-btn" title="Close">&times;</button>
+      </div>
+      <textarea id="prompt-text" class="prompt-text" readonly spellcheck="false"></textarea>
+      <div class="modal-actions">
+        <button id="prompt-copy" class="btn export-btn" title="Copy the prompt to your clipboard">Copy to Clipboard</button>
+        <button id="prompt-download" class="btn export-btn" title="Download the prompt as a .txt file">Download .txt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Export loading overlay ============ -->
+  <div id="export-overlay" class="modal-backdrop" hidden>
+    <div class="export-status">
+      <div id="export-anim" class="export-anim"></div>
+      <p id="export-message">Generating PDF&hellip;</p>
+    </div>
+  </div>
+
+  <!-- Toast for small notifications -->
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+
+  <!-- App -->
+  <script src="diagrams.js"></script>
+  <script src="export.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
