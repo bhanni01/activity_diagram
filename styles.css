@@ -443,6 +443,12 @@ select.text-input option {
 .conn-dot.out { background: var(--primary); box-shadow: 0 0 6px var(--primary); }
 
 /* ---------- Modal ---------- */
+.modal-backdrop[hidden],
+.toast[hidden],
+.tooltip[hidden] {
+  display: none;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
